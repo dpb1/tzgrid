@@ -1,0 +1,279 @@
+#!/usr/bin/python
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+from colorama import Fore
+from datetime import datetime, timedelta
+import sys
+from dateutil.tz import tzutc, gettz, tzlocal
+import optparse
+import pytz
+
+WORK_HOUR_12 = ["8a", "9a", "10a", "11a", "12p", "1p", "2p", "3p",
+                "4p", "5p", "6p"]
+ALL_TZ = pytz.all_timezones
+
+def get_utc_range(count):
+    """
+    Generate a range of times in UTC with *now* in the center.
+
+    @param count How large is the rannge to generate?
+    """
+    now = datetime.utcnow().replace(tzinfo=tzutc(), minute=0)
+    arr = [now]
+    if count < 3:
+        count = 3
+    count = count - 1
+    half = count / 2
+    for i in range(1, half + 1):
+        earlier = now - timedelta(hours=i)
+        later = now + timedelta(hours=i)
+        arr.insert(0, earlier)
+        arr.append(later)
+    return arr
+
+def format_as_am_pm(d, tz):
+    d = d.astimezone(tz)
+    return d.strftime('%-I') + d.strftime('%p').rstrip("M").lower()
+
+def format_range_am_pm(tz, width, days=False):
+    count = width / 4
+    arr = map(lambda x: format_as_am_pm(x, tz), get_utc_range(count))
+    format = ""
+    for i in range(0, len(arr)):
+        if i == len(arr) / 2:
+            format += Fore.RED + "[%3s]" + Fore.RESET + " "
+        elif arr[i] == "12a":
+            format += Fore.CYAN + "%3s" + Fore.RESET + " "
+        elif arr[i] in WORK_HOUR_12:
+            format += Fore.GREEN + "%3s" + Fore.RESET + " "
+        else:
+            format += "%3s "
+    return format % tuple(arr)
+
+def format_range_hours(tz, width):
+    count = width / 3
+    arr = get_utc_range(count)
+    format = ""
+    for i in range(0, len(arr)):
+        hour = arr[i].astimezone(tz).hour
+        if i == len(arr) / 2:
+            format += Fore.RED + "[%02d]" + Fore.RESET + " "
+        elif hour == 0:
+            format += Fore.CYAN + "%02d" + Fore.RESET + " "
+        elif hour >= 8 and hour <= 18:
+            format += Fore.GREEN + "%02d" + Fore.RESET + " "
+        else:
+            format += "%02d "
+        arr[i] = hour
+    return format % tuple(arr)
+
+def format_range_hours_minutes(tz, width):
+    count = width / 6
+    arr = get_utc_range(count)
+    format = ""
+    for i in range(0, len(arr)):
+        hour = arr[i].astimezone(tz).hour
+        if i == len(arr) / 2:
+            format += Fore.RED + "[%05s]" + Fore.RESET + " "
+        elif hour == 0:
+            format += Fore.CYAN + "%05s" + Fore.RESET + " "
+        elif hour >= 8 and hour <= 18:
+            format += Fore.GREEN + "%05s" + Fore.RESET + " "
+        else:
+            format += "%05s "
+        arr[i] = arr[i].astimezone(tz).strftime('%H:%M')
+    return format % tuple(arr)
+
+
+def convert_to_day(d, tz):
+    d = d.astimezone(tz)
+    if d.hour == 0:
+        return d.strftime('%a')
+    else:
+        return ""
+
+def format_range_hours_days(tz, width):
+    count = width / 3
+    arr = map(lambda x: convert_to_day(x, tz), get_utc_range(count))
+    format = ""
+    for i in range(0, len(arr)):
+        if i == len(arr) / 2:
+            format += "%-5s"
+        else:
+            format += "%-3s"
+    return format % tuple(arr)
+
+def label_size(arr):
+    size = 0
+    for entry in arr:
+        if len(entry[0]) > size:
+            size = len(entry[0])
+    return size
+
+def get_sorted_zones(tzs):
+    now = datetime.utcnow().replace(tzinfo=tzutc(), minute=0)
+    dates = []
+    for label, tz in tzs:
+        date = now.astimezone(tz)
+        dates.append(tuple([label,tz,date]))
+
+    sorted_zones = []
+    for label,zone,date in sorted(dates, key=lambda x: x[2].utcoffset()):
+        sorted_zones.append(tuple([label,zone]))
+
+    return sorted_zones
+
+def compare_timezones(a, b):
+    return get_tz_name(a) == get_tz_name(b)
+
+def get_tz_name(tz):
+    return datetime.utcnow().replace(tzinfo=tz, minute=0).tzname()
+
+def lookup_tz(name):
+    for candidate in ALL_TZ:
+        if name.lower() in candidate.lower():
+            return candidate
+    return None
+
+def check_zones(args):
+    error = False
+    zones = []
+    for arg in args:
+        if gettz(arg) is None:
+            name = lookup_tz(arg)
+            if name is not None:
+                zones.append(name)
+            else:
+                sys.stderr.write("Not a recognized timezone: %s\n" % arg)
+                error = True
+        else:
+            zones.append(arg)
+    if error:
+        sys.exit(1)
+    return zones
+
+def get_utc_zone_names():
+    offset = [0]
+    zones = []
+    for x in range(1, 12):
+        offset.insert(0, -x)
+        offset.append(+x)
+    for x in offset:
+        zones.append("UTC%+0i" % x)
+    return zones
+
+def get_northern_zone_names():
+    return ["Atlantic/Cape_Verde", "America/Noronha", "Atlantic/Stanley",
+            "America/Dominica", "America/New_York", "America/Mexico_City",
+            "America/Denver", "America/Los_Angeles",
+            "America/Anchorage",
+            "Pacific/Honolulu", "Pacific/Samoa",
+            "UTC", "Europe/London",
+            "Europe/Paris", "Europe/Athens", "Europe/Minsk", "Europe/Moscow",
+            "Asia/Karachi", "Asia/Dhaka", "Asia/Bangkok", "Asia/Hong_Kong",
+            "Asia/Tokyo", "Asia/Yakutsk", "Asia/Vladivostok"]
+
+def get_southern_zone_names():
+    return ["UTC", "US/Hawaii", "US/Pacific", "US/Mountain", "US/Central", "US/Eastern",
+            "Europe/London", "Europe/Moscow", "Asia/Tokyo"]
+
+def get_color_label_format(size, name, tz):
+    fmt = "%-" + "%i" % size + "s" 
+    if compare_timezones(tz, tzlocal()):
+        fmt = Fore.BLUE + fmt
+        fmt = fmt + Fore.RESET
+    return fmt
+
+def print_grid(zone_names, args, options):
+    if len(args) >= 1:
+        zone_names = args
+    tzs = []
+    for name in zone_names:
+        tz = gettz(name)
+        tzs.append(tuple([name, gettz(name)]))
+
+    size = label_size(tzs)
+    tzs = get_sorted_zones(tzs)
+
+    if not options.twelve:
+        fmt = get_color_label_format(size, name, tz) + "   %s"
+        times = format_range_hours_days(tzs[0][1], options.width - size - 5)
+        print fmt % ("", times)
+
+    for name, tz in tzs:
+        fmt = get_color_label_format(size, name, tz) + " | %s"
+        if (options.twelve):
+            times = format_range_am_pm(tz, options.width - size - 5)
+        else:
+            times = format_range_hours(tz, options.width - size - 5)
+
+        print fmt % (name, times)
+
+def terminal_size():
+    import fcntl, termios, struct
+    h, w, hp, wp = struct.unpack('HHHH',
+        fcntl.ioctl(0, termios.TIOCGWINSZ,
+        struct.pack('HHHH', 0, 0, 0, 0)))
+    return w, h
+
+def setup_parser():
+    parser = optparse.OptionParser()
+    parser.add_option('-w', '--width', help='Terminal width, in characters',
+                      dest="width", default=None)
+    parser.add_option('-l', '--list', help='List all supported timezones',
+                      dest="list",
+                      action="store_true", default=False)
+    parser.add_option('-n', '--northern', help='Use Northern Hemisphere Timezones',
+                      dest="northern",
+                      action="store_true", default=False)
+    parser.add_option('-s', '--southern', help='Use Southern Hemisphere Timezones',
+                      dest="southern",
+                      action="store_true", default=False)
+    parser.add_option('-t', '--twelve', help='Use 12-hour clock times',
+                      dest="twelve",
+                      action="store_true", default=False)
+    parser.add_option('-u', '--utc', help='Use UTC offset Timezones',
+                      dest="utc",
+                      action="store_true", default=False)
+
+    return parser
+
+def main():
+    parser = setup_parser()
+    (options, args) = parser.parse_args()
+
+    # If terminal width not set, detect
+    # TODO: will need a non-interactive test
+    if options.width == None:
+        options.width = terminal_size()[0]
+
+    if options.northern:
+        zone_names = get_northern_zone_names()
+    elif options.utc:
+        zone_names = get_utc_zone_names()
+    else:
+        zone_names = get_utc_zone_names()
+
+    if options.list:
+        for tz in pytz.all_timezones:
+            print tz
+        sys.exit(0)
+    else:
+        args = check_zones(args)
+        print_grid(zone_names, args, options)
+
+if __name__ == '__main__':
+    main()
