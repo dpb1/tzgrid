@@ -20,6 +20,12 @@ import sys
 from dateutil.tz import tzutc, gettz, tzlocal
 import optparse
 import pytz
+import ConfigParser
+import os
+
+config_parser = ConfigParser.ConfigParser()
+config_parser.read(["/etc/tzgrid.cfg", os.path.expanduser("~/.tzgrid.cfg")])
+CONFIG = config_parser.items("DEFAULT")
 
 WORK_HOUR_12 = ["8a", "9a", "10a", "11a", "12p", "1p", "2p", "3p",
                 "4p", "5p", "6p"]
@@ -166,6 +172,9 @@ def check_zones(args):
     return zones
 
 def get_utc_zone_names():
+    """
+    Return all UTC offsets 12 hours on either side of UTC
+    """
     offset = [0]
     zones = []
     for x in range(1, 12):
@@ -176,6 +185,9 @@ def get_utc_zone_names():
     return zones
 
 def get_northern_zone_names():
+    """
+    TODO: read in from configuration
+    """
     return ["Atlantic/Cape_Verde", "America/Noronha", "Atlantic/Stanley",
             "America/Dominica", "America/New_York", "America/Mexico_City",
             "America/Denver", "America/Los_Angeles",
@@ -187,19 +199,32 @@ def get_northern_zone_names():
             "Asia/Tokyo", "Asia/Yakutsk", "Asia/Vladivostok"]
 
 def get_southern_zone_names():
+    """
+    TODO: read in from configuration
+    """
     return ["UTC", "US/Hawaii", "US/Pacific", "US/Mountain", "US/Central", "US/Eastern",
             "Europe/London", "Europe/Moscow", "Asia/Tokyo"]
 
-def get_color_label_format(size, name, tz):
+def get_color_label_format(size, tz):
+    """
+    Generate a format string (colorized) to print out row labels.
+
+    @param size How large will the label column be?
+    @param tz The timezone whos name will be printed as a label.
+    """
     fmt = "%-" + "%i" % size + "s" 
     if compare_timezones(tz, tzlocal()):
         fmt = Fore.BLUE + fmt
         fmt = fmt + Fore.RESET
     return fmt
 
-def print_grid(zone_names, args, options):
-    if len(args) >= 1:
-        zone_names = args
+def print_grid(zone_names, options):
+    """
+    Print the tzgrid.
+
+    @param zone_names list of zones to print
+    @param options command line options to control printing behavior
+    """
     tzs = []
     for name in zone_names:
         tz = gettz(name)
@@ -209,12 +234,12 @@ def print_grid(zone_names, args, options):
     tzs = get_sorted_zones(tzs)
 
     if not options.twelve:
-        fmt = get_color_label_format(size, name, tz) + "   %s"
+        fmt = get_color_label_format(size, tz) + "   %s"
         times = format_range_hours_days(tzs[0][1], options.width - size - 5)
         print fmt % ("", times)
 
     for name, tz in tzs:
-        fmt = get_color_label_format(size, name, tz) + " | %s"
+        fmt = get_color_label_format(size, tz) + " | %s"
         if (options.twelve):
             times = format_range_am_pm(tz, options.width - size - 5)
         else:
@@ -222,7 +247,32 @@ def print_grid(zone_names, args, options):
 
         print fmt % (name, times)
 
+def get_zone_names(options, args):
+    """
+    Return the time zone names specified by the user (or defaults), as a list.
+    Config, options, arguments are all consulted.
+
+    @param options command line options
+    @param args command line arguments
+    """
+    if len(args) >= 1:
+        zone_names = args
+    elif options.utc:
+        zone_names = get_utc_zone_names()
+    elif options.northern:
+        zone_names = get_northern_zone_names()
+    elif "zones" in CONFIG:
+        zone_names = CONFIG["zones"].split(",")
+    else:
+        zone_names = get_utc_zone_names()
+    return zone_names
+
 def terminal_size():
+    """
+    Detect the terminal size from the termios package.
+
+    TODO: will need a non-interactive test
+    """
     import fcntl, termios, struct
     h, w, hp, wp = struct.unpack('HHHH',
         fcntl.ioctl(0, termios.TIOCGWINSZ,
@@ -248,7 +298,6 @@ def setup_parser():
     parser.add_option('-u', '--utc', help='Use UTC offset Timezones',
                       dest="utc",
                       action="store_true", default=False)
-
     return parser
 
 def main():
@@ -256,24 +305,18 @@ def main():
     (options, args) = parser.parse_args()
 
     # If terminal width not set, detect
-    # TODO: will need a non-interactive test
     if options.width == None:
         options.width = terminal_size()[0]
 
-    if options.northern:
-        zone_names = get_northern_zone_names()
-    elif options.utc:
-        zone_names = get_utc_zone_names()
-    else:
-        zone_names = get_utc_zone_names()
+    zone_names = get_zone_names(options, args)
 
     if options.list:
         for tz in pytz.all_timezones:
             print tz
         sys.exit(0)
     else:
-        args = check_zones(args)
-        print_grid(zone_names, args, options)
+        zone_names = check_zones(zone_names)
+        print_grid(zone_names, options)
 
 if __name__ == '__main__':
     main()
