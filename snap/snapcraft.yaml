@@ -17,3 +17,6 @@ parts:
     python-version: python3
     source: .
     requirements: requirements.txt
+  examples:
+    plugin: dump
+    source: ./examples
