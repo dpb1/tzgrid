@@ -4,7 +4,7 @@ summary: Display a grid of times to help with timezone math.
 description: |
   Display a grid of times to help with timezone math.
 
-grade: devel # must be 'stable' to release into candidate/stable channels
+grade: stable
 confinement: strict
 
 apps:
