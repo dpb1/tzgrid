@@ -1,3 +1,5 @@
+[![Snap Status](https://build.snapcraft.io/badge/dpb1/tzgrid.svg)](https://build.snapcraft.io/user/dpb1/tzgrid)
+
 tzgrid
 ======
 
