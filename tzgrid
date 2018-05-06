@@ -15,22 +15,18 @@
 #
 
 from datetime import datetime, timedelta
+import fcntl
 import optparse
 import os
+import struct
 import sys
+import termios
 
 import configparser
 from colorama import Fore
 from dateutil.tz import tzutc, gettz, tzlocal
 import pytz
 
-config = configparser.ConfigParser()
-config.read(["/etc/tzgrid.cfg", os.path.expanduser("~/.tzgrid.cfg")])
-CONFIG = config.get('DEFAULT', 'zones', fallback='')
-
-WORK_HOUR_12 = ["8a", "9a", "10a", "11a", "12p", "1p", "2p", "3p",
-                "4p", "5p", "6p"]
-ALL_TZ = pytz.all_timezones
 
 def get_utc_range(count):
     """
@@ -51,11 +47,16 @@ def get_utc_range(count):
         arr.append(later)
     return arr
 
+
 def format_as_am_pm(d, tz):
     d = d.astimezone(tz)
     return d.strftime('%-I') + d.strftime('%p').rstrip("M").lower()
 
+
 def format_range_am_pm(tz, width, days=False):
+    work_hour_12 = [
+        "8a", "9a", "10a", "11a", "12p", "1p", "2p", "3p",
+        "4p", "5p", "6p"]
     count = int(width / 4)
     arr = list(map(lambda x: format_as_am_pm(x, tz), get_utc_range(count)))
     format = ""
@@ -64,11 +65,12 @@ def format_range_am_pm(tz, width, days=False):
             format += Fore.RED + "[%3s]" + Fore.RESET + " "
         elif arr[i] == "12a":
             format += Fore.CYAN + "%3s" + Fore.RESET + " "
-        elif arr[i] in WORK_HOUR_12:
+        elif arr[i] in work_hour_12:
             format += Fore.GREEN + "%3s" + Fore.RESET + " "
         else:
             format += "%3s "
     return format % tuple(arr)
+
 
 def format_range_hours(tz, width):
     count = int(width / 3)
@@ -86,6 +88,7 @@ def format_range_hours(tz, width):
             format += "%02d "
         arr[i] = hour
     return format % tuple(arr)
+
 
 def format_range_hours_minutes(tz, width):
     count = int(width / 6)
@@ -112,6 +115,7 @@ def convert_to_day(d, tz):
     else:
         return ""
 
+
 def format_range_hours_days(tz, width):
     count = int(width / 3)
     arr = list(map(lambda x: convert_to_day(x, tz), get_utc_range(count)))
@@ -123,6 +127,7 @@ def format_range_hours_days(tz, width):
             format += "%-3s"
     return format % tuple(arr)
 
+
 def label_size(arr):
     size = 0
     for entry in arr:
@@ -130,30 +135,35 @@ def label_size(arr):
             size = len(entry[0])
     return size
 
+
 def get_sorted_zones(tzs):
     now = datetime.utcnow().replace(tzinfo=tzutc(), minute=0)
     dates = []
     for label, tz in tzs:
         date = now.astimezone(tz)
-        dates.append(tuple([label,tz,date]))
+        dates.append(tuple([label, tz, date]))
 
     sorted_zones = []
-    for label,zone,date in sorted(dates, key=lambda x: x[2].utcoffset()):
-        sorted_zones.append(tuple([label,zone]))
+    for label, zone, date in sorted(dates, key=lambda x: x[2].utcoffset()):
+        sorted_zones.append(tuple([label, zone]))
 
     return sorted_zones
+
 
 def compare_timezones(a, b):
     return get_tz_name(a) == get_tz_name(b)
 
+
 def get_tz_name(tz):
     return datetime.utcnow().replace(tzinfo=tz, minute=0).tzname()
 
+
 def lookup_tz(name):
-    for candidate in ALL_TZ:
+    for candidate in pytz.all_timezones:
         if name.lower() in candidate.lower():
             return candidate
     return None
+
 
 def check_zones(args):
     error = False
@@ -172,6 +182,7 @@ def check_zones(args):
         sys.exit(1)
     return zones
 
+
 def get_utc_zone_names():
     """
     Return all UTC offsets 12 hours on either side of UTC
@@ -185,26 +196,16 @@ def get_utc_zone_names():
         zones.append("UTC%+0i" % x)
     return zones
 
-def get_northern_zone_names():
-    """
-    TODO: read in from configuration
-    """
-    return ["Atlantic/Cape_Verde", "America/Noronha", "Atlantic/Stanley",
-            "America/Dominica", "America/New_York", "America/Mexico_City",
-            "America/Denver", "America/Los_Angeles",
-            "America/Anchorage",
-            "Pacific/Honolulu", "Pacific/Samoa",
-            "UTC", "Europe/London",
-            "Europe/Paris", "Europe/Athens", "Europe/Minsk", "Europe/Moscow",
-            "Asia/Karachi", "Asia/Dhaka", "Asia/Bangkok", "Asia/Hong_Kong",
-            "Asia/Tokyo", "Asia/Yakutsk", "Asia/Vladivostok"]
 
-def get_southern_zone_names():
-    """
-    TODO: read in from configuration
-    """
-    return ["UTC", "US/Hawaii", "US/Pacific", "US/Mountain", "US/Central", "US/Eastern",
-            "Europe/London", "Europe/Moscow", "Asia/Tokyo"]
+def get_zone_names_from_config():
+    """Read the config and return zone names found."""
+    config = configparser.ConfigParser()
+    config.read([
+        "/etc/tzgrid.cfg",
+        os.path.expanduser("~/.tzgrid.cfg"),
+        os.path.expanduser("~/snap/tzgrid/current/tzgrid.cfg")])
+    return config.get('DEFAULT', 'zones', fallback='')
+
 
 def get_color_label_format(size, tz):
     """
@@ -213,11 +214,12 @@ def get_color_label_format(size, tz):
     @param size How large will the label column be?
     @param tz The timezone whos name will be printed as a label.
     """
-    fmt = "%-" + "%i" % size + "s" 
+    fmt = "%-" + "%i" % size + "s"
     if compare_timezones(tz, tzlocal()):
         fmt = Fore.BLUE + fmt
         fmt = fmt + Fore.RESET
     return fmt
+
 
 def print_grid(zone_names, options):
     """
@@ -248,6 +250,7 @@ def print_grid(zone_names, options):
 
         print(fmt % (name, times))
 
+
 def get_zone_names(options, args):
     """
     Return the time zone names specified by the user (or defaults), as a list.
@@ -256,57 +259,68 @@ def get_zone_names(options, args):
     @param options command line options
     @param args command line arguments
     """
+    config = get_zone_names_from_config()
     if len(args) >= 1:
         zone_names = args
     elif options.utc:
         zone_names = get_utc_zone_names()
-    elif options.northern:
-        zone_names = get_northern_zone_names()
-    elif CONFIG:
-        zone_names = CONFIG.split(",")
+    elif config:
+        zone_names = config.split(",")
     else:
         zone_names = get_utc_zone_names()
     return zone_names
 
-def terminal_size():
-    """
-    Detect the terminal size from the termios package.
 
-    TODO: will need a non-interactive test
-    """
-    import fcntl, termios, struct
-    h, w, hp, wp = struct.unpack('HHHH',
-        fcntl.ioctl(0, termios.TIOCGWINSZ,
-        struct.pack('HHHH', 0, 0, 0, 0)))
+def interactive_terminal():
+    """Return true only if running in an interactive terminal."""
+    if (
+            os.isatty(sys.stdin.fileno()) or
+            not os.isatty(sys.stdout.fileno())):
+        return True
+    return False
+
+
+def terminal_size():
+    """Detect and return the terminal size."""
+    if not interactive_terminal():
+        return 80, 24
+    h, w, hp, wp = struct.unpack(
+        'HHHH',
+        fcntl.ioctl(
+            0, termios.TIOCGWINSZ,
+            struct.pack('HHHH', 0, 0, 0, 0)))
     return w, h
 
+
 def setup_parser():
+    """Setup the commandline parser."""
     parser = optparse.OptionParser()
-    parser.add_option('-w', '--width', help='Terminal width, in characters',
-                      dest="width", default=None)
-    parser.add_option('-l', '--list', help='List all supported timezones',
-                      dest="list",
-                      action="store_true", default=False)
-    parser.add_option('-n', '--northern', help='Use Northern Hemisphere Timezones',
-                      dest="northern",
-                      action="store_true", default=False)
-    parser.add_option('-s', '--southern', help='Use Southern Hemisphere Timezones',
-                      dest="southern",
-                      action="store_true", default=False)
-    parser.add_option('-t', '--twelve', help='Use 12-hour clock times',
-                      dest="twelve",
-                      action="store_true", default=False)
-    parser.add_option('-u', '--utc', help='Use UTC offset Timezones',
-                      dest="utc",
-                      action="store_true", default=False)
+    parser.add_option(
+        '-w', '--width',
+        help='Output width, in characters',
+        dest="width", default=None)
+    parser.add_option(
+        '-l', '--list',
+        help='List all recognized timezones',
+        dest="list", action="store_true", default=False)
+    parser.add_option(
+        '-t', '--twelve',
+        help='Use 12-hour clock times',
+        dest="twelve",
+        action="store_true", default=False)
+    parser.add_option(
+        '-u', '--utc',
+        help='Use list of utc offsets',
+        dest="utc", action="store_true", default=False)
     return parser
+
 
 def main():
     parser = setup_parser()
     (options, args) = parser.parse_args()
 
     # If terminal width not set, detect
-    if options.width == None:
+    if options.width is None:
         options.width = int(terminal_size()[0])
 
     zone_names = get_zone_names(options, args)
@@ -318,6 +332,7 @@ def main():
     else:
         zone_names = check_zones(zone_names)
         print_grid(zone_names, options)
+
 
 if __name__ == '__main__':
     main()
