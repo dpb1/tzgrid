@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,18 +14,19 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from colorama import Fore
 from datetime import datetime, timedelta
-import sys
-from dateutil.tz import tzutc, gettz, tzlocal
 import optparse
-import pytz
-import ConfigParser
 import os
+import sys
 
-config_parser = ConfigParser.ConfigParser()
-config_parser.read(["/etc/tzgrid.cfg", os.path.expanduser("~/.tzgrid.cfg")])
-CONFIG = config_parser.items("DEFAULT")
+import configparser
+from colorama import Fore
+from dateutil.tz import tzutc, gettz, tzlocal
+import pytz
+
+config = configparser.ConfigParser()
+config.read(["/etc/tzgrid.cfg", os.path.expanduser("~/.tzgrid.cfg")])
+CONFIG = config.get('DEFAULT', 'zones', fallback='')
 
 WORK_HOUR_12 = ["8a", "9a", "10a", "11a", "12p", "1p", "2p", "3p",
                 "4p", "5p", "6p"]
@@ -42,7 +43,7 @@ def get_utc_range(count):
     if count < 3:
         count = 3
     count = count - 1
-    half = count / 2
+    half = int(count / 2)
     for i in range(1, half + 1):
         earlier = now - timedelta(hours=i)
         later = now + timedelta(hours=i)
@@ -55,11 +56,11 @@ def format_as_am_pm(d, tz):
     return d.strftime('%-I') + d.strftime('%p').rstrip("M").lower()
 
 def format_range_am_pm(tz, width, days=False):
-    count = width / 4
-    arr = map(lambda x: format_as_am_pm(x, tz), get_utc_range(count))
+    count = int(width / 4)
+    arr = list(map(lambda x: format_as_am_pm(x, tz), get_utc_range(count)))
     format = ""
     for i in range(0, len(arr)):
-        if i == len(arr) / 2:
+        if i == int(len(arr) / 2):
             format += Fore.RED + "[%3s]" + Fore.RESET + " "
         elif arr[i] == "12a":
             format += Fore.CYAN + "%3s" + Fore.RESET + " "
@@ -70,12 +71,12 @@ def format_range_am_pm(tz, width, days=False):
     return format % tuple(arr)
 
 def format_range_hours(tz, width):
-    count = width / 3
+    count = int(width / 3)
     arr = get_utc_range(count)
     format = ""
     for i in range(0, len(arr)):
         hour = arr[i].astimezone(tz).hour
-        if i == len(arr) / 2:
+        if i == int(len(arr) / 2):
             format += Fore.RED + "[%02d]" + Fore.RESET + " "
         elif hour == 0:
             format += Fore.CYAN + "%02d" + Fore.RESET + " "
@@ -87,12 +88,12 @@ def format_range_hours(tz, width):
     return format % tuple(arr)
 
 def format_range_hours_minutes(tz, width):
-    count = width / 6
+    count = int(width / 6)
     arr = get_utc_range(count)
     format = ""
     for i in range(0, len(arr)):
         hour = arr[i].astimezone(tz).hour
-        if i == len(arr) / 2:
+        if i == int(len(arr) / 2):
             format += Fore.RED + "[%05s]" + Fore.RESET + " "
         elif hour == 0:
             format += Fore.CYAN + "%05s" + Fore.RESET + " "
@@ -112,11 +113,11 @@ def convert_to_day(d, tz):
         return ""
 
 def format_range_hours_days(tz, width):
-    count = width / 3
-    arr = map(lambda x: convert_to_day(x, tz), get_utc_range(count))
+    count = int(width / 3)
+    arr = list(map(lambda x: convert_to_day(x, tz), get_utc_range(count)))
     format = ""
     for i in range(0, len(arr)):
-        if i == len(arr) / 2:
+        if i == int(len(arr) / 2):
             format += "%-5s"
         else:
             format += "%-3s"
@@ -236,7 +237,7 @@ def print_grid(zone_names, options):
     if not options.twelve:
         fmt = get_color_label_format(size, tz) + "   %s"
         times = format_range_hours_days(tzs[0][1], options.width - size - 5)
-        print fmt % ("", times)
+        print(fmt % ("", times))
 
     for name, tz in tzs:
         fmt = get_color_label_format(size, tz) + " | %s"
@@ -245,7 +246,7 @@ def print_grid(zone_names, options):
         else:
             times = format_range_hours(tz, options.width - size - 5)
 
-        print fmt % (name, times)
+        print(fmt % (name, times))
 
 def get_zone_names(options, args):
     """
@@ -261,8 +262,8 @@ def get_zone_names(options, args):
         zone_names = get_utc_zone_names()
     elif options.northern:
         zone_names = get_northern_zone_names()
-    elif "zones" in CONFIG:
-        zone_names = CONFIG["zones"].split(",")
+    elif CONFIG:
+        zone_names = CONFIG.split(",")
     else:
         zone_names = get_utc_zone_names()
     return zone_names
@@ -306,13 +307,13 @@ def main():
 
     # If terminal width not set, detect
     if options.width == None:
-        options.width = terminal_size()[0]
+        options.width = int(terminal_size()[0])
 
     zone_names = get_zone_names(options, args)
 
     if options.list:
         for tz in pytz.all_timezones:
-            print tz
+            print(tz)
         sys.exit(0)
     else:
         zone_names = check_zones(zone_names)

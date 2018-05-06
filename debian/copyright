@@ -1,7 +1,0 @@
-Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: tzgrid
-Upstream-Contact: David Britton, <davidpbritton@gmail.com>
-Files: *
-Copyright: 2013, David Britton, <davidpbritton@gmail.com>
-License: GPL-3
-See: `/usr/share/common-licenses/GPL-3'
