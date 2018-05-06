@@ -199,11 +199,10 @@ def get_utc_zone_names():
 
 def get_zone_names_from_config():
     """Read the config and return zone names found."""
+    user_data = os.environ.get('SNAP_USER_DATA', "~/config/tzgrid/")
     config = configparser.ConfigParser()
     config.read([
-        "/etc/tzgrid.cfg",
-        os.path.expanduser("~/.tzgrid.cfg"),
-        os.path.expanduser("~/snap/tzgrid/current/tzgrid.cfg")])
+        os.path.expanduser(user_data + "/tzgrid.cfg")])
     return config.get('DEFAULT', 'zones', fallback='')
 
 
