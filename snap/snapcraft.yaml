@@ -10,7 +10,7 @@ confinement: strict
 apps:
   tzgrid:
     # see: http://pad.lv/1576411
-    command: env LC_ALL=C.UTF-8 tzgrid.py
+    command: env LC_ALL=C.UTF-8 python3 -m tzgrid
 
 parts:
   tzgrid:
@@ -21,6 +21,3 @@ parts:
   examples:
     plugin: dump
     source: ./examples
-  data:
-    plugin: dump
-    source: ./data

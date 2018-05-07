@@ -113,6 +113,49 @@ class Zones(object):
     def compare(self, a, b):
         return self.get_tz_name(a) == self.get_tz_name(b)
 
+    def search_pytz_data(search):
+        results = []
+        for tz in pytz.all_timezones:
+            if search.lower() == tz.lower():
+                results.append({
+                    'name': tz, 'timezone': tz})
+        return results
+
+    def search_geolocation_data_field(data, search, field):
+        search = search.lower()
+        results = []
+        for record in data:
+            if search in record[field].lower():
+                results.append(record)
+        return results
+
+    def search_geolocation_data(data, search, verbose=False):
+        results = search_pytz_data(search)
+        if len(results) == 1:
+            return results
+
+        for field in ['name', 'asciiname', 'alternatenames']:
+            results = search_geolocation_data_field(data, search, field)
+            if len(results) == 1:
+                return results
+            if len(results) > 1:
+                continue
+
+        print("Location '{}' has {} possible matches.  Specify the timezone\n"
+            "directly if possible.  Use '--search STRING' to help narrow\n"
+            "down your search string.\n".format(
+                search, len(results)))
+        for record in results:
+            print(" * {}: {}".format(
+                record['name'],
+                record['timezone']))
+            if verbose:
+                print("   - Population: {}".format(record['population']))
+                print("   - ASCII Name: {}".format(record['asciiname']))
+                print("   - Alternate Names: {}".format(record['alternatenames']))
+        sys.exit(1)
+
+
 
 def get_zone_names_from_config():
     """Read the config and return zone names found."""
@@ -122,32 +165,6 @@ def get_zone_names_from_config():
         os.path.expanduser(user_data + "/tzgrid.cfg")])
     return config.get('DEFAULT', 'zones', fallback='')
 
-
-def search_geolocation_data(data, search, verbose=False):
-    results = search_pytz_data(search)
-    if len(results) == 1:
-        return results
-
-    for field in ['name', 'asciiname', 'alternatenames']:
-        results = search_geolocation_data_field(data, search, field)
-        if len(results) == 1:
-            return results
-        if len(results) > 1:
-            continue
-
-    print("Location '{}' has {} possible matches.  Specify the timezone\n"
-          "directly if possible.  Use '--search STRING' to help narrow\n"
-          "down your search string.\n".format(
-              search, len(results)))
-    for record in results:
-        print(" * {}: {}".format(
-            record['name'],
-            record['timezone']))
-        if verbose:
-            print("   - Population: {}".format(record['population']))
-            print("   - ASCII Name: {}".format(record['asciiname']))
-            print("   - Alternate Names: {}".format(record['alternatenames']))
-    sys.exit(1)
 
 
 def get_zone_names(options, args):
@@ -170,19 +187,4 @@ def get_zone_names(options, args):
     return zone_names
 
 
-def search_pytz_data(search):
-    results = []
-    for tz in pytz.all_timezones:
-        if search.lower() == tz.lower():
-            results.append({
-                'name': tz, 'timezone': tz})
-    return results
 
-
-def search_geolocation_data_field(data, search, field):
-    search = search.lower()
-    results = []
-    for record in data:
-        if search in record[field].lower():
-            results.append(record)
-    return results
