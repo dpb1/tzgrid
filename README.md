@@ -33,6 +33,7 @@ Modify the config file in ~/snap/tzgrid/current/tzgrid.cfg to list the
 
 # TODO
 
+- make/snapcraft target to pull in geolocation database at build
 - split out into proper python modules
 - tests
 - better documentation
