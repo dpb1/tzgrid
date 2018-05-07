@@ -33,6 +33,7 @@ Modify the config file in ~/snap/tzgrid/current/tzgrid.cfg to list the
 
 # TODO
 
+- split out into proper python modules
 - tests
 - better documentation
 - make hh:mm a full option
