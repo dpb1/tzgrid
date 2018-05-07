@@ -20,6 +20,6 @@ parts:
   examples:
     plugin: dump
     source: ./examples
-  cities-db:
+  data:
     plugin: dump
-    source: ./cities15000.txt
+    source: ./data
