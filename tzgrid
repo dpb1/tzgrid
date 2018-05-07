@@ -192,6 +192,8 @@ def get_tz_name(tz):
 
 
 def lookup_tz(name):
+    if gettz(name):
+        return name
     geo_data = read_geolocation_data()
     results = search_geolocation_data(geo_data, name)
     return results[0]['timezone']
