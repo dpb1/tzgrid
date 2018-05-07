@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+
+cp ${SNAP}/tzgrid.cfg ${SNAP_DATA}/tzgrid.cfg
