@@ -20,3 +20,6 @@ parts:
   examples:
     plugin: dump
     source: ./examples
+  data:
+    plugin: dump
+    source: ./cities15000.txt

@@ -26,6 +26,35 @@ import configparser
 from colorama import Fore
 from dateutil.tz import tzutc, gettz, tzlocal
 import pytz
+import unicodecsv as csv
+
+
+def read_geolocation_data():
+    results = []
+    with open('data/cities15000.txt', 'rb') as csvfile:
+        cityreader = csv.reader(csvfile, encoding='utf-8', delimiter='\t')
+        for row in cityreader:
+            results.append({
+                'geonameid': row[0],
+                'name': row[1],
+                'asciiname': row[2],
+                'alternatenames': row[3],
+                'latitude': row[4],
+                'longitude': row[5],
+                'feature class': row[6],
+                'feature code': row[7],
+                'country code': row[8],
+                'cc2': row[9],
+                'admin1 code': row[10],
+                'admin2 code': row[11],
+                'admin3 code': row[12],
+                'admin4 code': row[13],
+                'population': row[14],
+                'elevation': row[15],
+                'dem': row[16],
+                'timezone': row[17],
+                'modification date': row[18]})
+    return results
 
 
 def get_utc_range(count):
@@ -159,27 +188,15 @@ def get_tz_name(tz):
 
 
 def lookup_tz(name):
-    for candidate in pytz.all_timezones:
-        if name.lower() in candidate.lower():
-            return candidate
-    return None
+    geo_data = read_geolocation_data()
+    results = search_geolocation_data(geo_data, name)
+    return results[0]['timezone']
 
 
 def check_zones(args):
-    error = False
     zones = []
     for arg in args:
-        if gettz(arg) is None:
-            name = lookup_tz(arg)
-            if name is not None:
-                zones.append(name)
-            else:
-                sys.stderr.write("Not a recognized timezone: %s\n" % arg)
-                error = True
-        else:
-            zones.append(arg)
-    if error:
-        sys.exit(1)
+        zones.append(lookup_tz(arg))
     return zones
 
 
@@ -270,6 +287,51 @@ def get_zone_names(options, args):
     return zone_names
 
 
+def search_geolocation_data(data, search, verbose=False):
+    results = search_pytz_data(search)
+    if len(results) == 1:
+        return results
+
+    for field in ['name', 'asciiname', 'alternatenames']:
+        results = search_geolocation_data_field(data, search, field)
+        if len(results) == 1:
+            return results
+        if len(results) > 1:
+            continue
+
+    print("Location '{}' has {} possible matches.  Specify the timezone\n"
+          "directly if possible.  Use '--search STRING' to help narrow\n"
+          "down your search string.\n".format(
+              search, len(results)))
+    for record in results:
+        print(" * {}: {}".format(
+            record['name'],
+            record['timezone']))
+        if verbose:
+            print("   - Population: {}".format(record['population']))
+            print("   - ASCII Name: {}".format(record['asciiname']))
+            print("   - Alternate Names: {}".format(record['alternatenames']))
+    sys.exit(1)
+
+
+def search_pytz_data(search):
+    results = []
+    for tz in pytz.all_timezones:
+        if search.lower() == tz.lower():
+            results.append({
+                'name': tz, 'timezone': tz})
+    return results
+
+
+def search_geolocation_data_field(data, search, field):
+    search = search.lower()
+    results = []
+    for record in data:
+        if search in record[field].lower():
+            results.append(record)
+    return results
+
+
 def interactive_terminal():
     """Return true only if running in an interactive terminal."""
     if (
@@ -294,6 +356,14 @@ def terminal_size():
 def setup_parser():
     """Setup the commandline parser."""
     parser = optparse.OptionParser()
+    parser.add_option(
+        '-v', '--verbose',
+        help='Be more verbose',
+        dest="verbose", action="store_true", default=False)
+    parser.add_option(
+        '-s', '--search',
+        help='Search the geolocation database directly',
+        dest="search", default=None)
     parser.add_option(
         '-w', '--width',
         help='Output width, in characters',
@@ -327,6 +397,20 @@ def main():
     if options.list:
         for tz in pytz.all_timezones:
             print(tz)
+        sys.exit(0)
+    if options.search:
+        geo_data = read_geolocation_data()
+        results = search_geolocation_data(
+            geo_data,
+            options.search,
+            verbose=options.verbose)
+        for record in results:
+            if record['name'] == record['timezone']:
+                print("Exact Match: {}".format(record['timezone']))
+            else:
+                print("{}: {}".format(
+                    record['name'],
+                    record['timezone']))
         sys.exit(0)
     else:
         zone_names = check_zones(zone_names)

@@ -1,4 +1,5 @@
-python-dateutil
 colorama
-pytz
 configparser
+python-dateutil
+pytz
+unicodecsv
