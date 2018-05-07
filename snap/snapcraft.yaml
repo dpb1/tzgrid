@@ -10,7 +10,7 @@ confinement: strict
 apps:
   tzgrid:
     # see: http://pad.lv/1576411
-    command: env LC_ALL=C.UTF-8 tzgrid
+    command: env LC_ALL=C.UTF-8 tzgrid.py
 
 parts:
   tzgrid:
