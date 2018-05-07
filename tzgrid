@@ -32,7 +32,9 @@ import unicodecsv as csv
 
 def read_geolocation_data():
     results = []
-    with open('cities15000.txt', 'rb') as csvfile:
+    cities_data = os.path.join(
+        os.environ.get("SNAP", ""), "cities15000.txt")
+    with open(cities_data, 'rb') as csvfile:
         cityreader = csv.reader(csvfile, encoding='utf-8', delimiter='\t')
         for row in cityreader:
             results.append({
