@@ -24,7 +24,7 @@ import unicodecsv as csv
 
 def read_geolocation_data():
     results = []
-    filename = pkg_resources.resource_filename(__package__, "cities15000.txt")
+    filename = pkg_resources.resource_filename(__package__, "cities100000.txt")
     with open(filename, 'rb') as csvfile:
         cityreader = csv.reader(csvfile, encoding='utf-8', delimiter='\t')
         for row in cityreader:
