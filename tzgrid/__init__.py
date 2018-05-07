@@ -25,37 +25,7 @@ from colorama import Fore
 import dateutil.parser
 from dateutil.tz import tzutc, gettz, tzlocal
 import pytz
-import unicodecsv as csv
-
-
-def read_geolocation_data():
-    results = []
-    cities_data = os.path.join(
-        os.environ.get("SNAP", ""), "cities15000.txt")
-    with open(cities_data, 'rb') as csvfile:
-        cityreader = csv.reader(csvfile, encoding='utf-8', delimiter='\t')
-        for row in cityreader:
-            results.append({
-                'geonameid': row[0],
-                'name': row[1],
-                'asciiname': row[2],
-                'alternatenames': row[3],
-                'latitude': row[4],
-                'longitude': row[5],
-                'feature class': row[6],
-                'feature code': row[7],
-                'country code': row[8],
-                'cc2': row[9],
-                'admin1 code': row[10],
-                'admin2 code': row[11],
-                'admin3 code': row[12],
-                'admin4 code': row[13],
-                'population': row[14],
-                'elevation': row[15],
-                'dem': row[16],
-                'timezone': row[17],
-                'modification date': row[18]})
-    return results
+from tzgrid.zones import read_geolocation_data
 
 
 def get_utc_range(count, options):

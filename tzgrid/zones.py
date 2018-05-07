@@ -23,7 +23,7 @@ import pytz
 import unicodecsv as csv
 
 
-def _read_geolocation_data():
+def read_geolocation_data():
     results = []
 
     filename = pkg_resources.resource_filename(__package__, "cities15000.txt")
